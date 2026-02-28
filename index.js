@@ -8,18 +8,40 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+/*
+  CORS Configuration
+  Allow:
+  - Localhost (development)
+  - Production frontend (set FRONTEND_URL in Render env if needed)
+*/
+
+const allowedOrigins = [
+  "http://localhost:3000",
+  process.env.FRONTEND_URL, // optional production frontend URL
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: "*",
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like Postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
   })
 );
+
 app.use(express.json());
 
 const CRM_BASE_URL =
   "https://ttr171-api.iqsetter.com/crm/lead/create?authkey=";
 
 app.post("/api/lead", async (req, res) => {
-  console.log("[/api/lead] Incoming request body:", req.body);
+  console.log("[/api/lead] Incoming request:", req.body);
 
   try {
     const {
@@ -30,8 +52,8 @@ app.post("/api/lead", async (req, res) => {
       property_project_name = "Orchid IVY - Sector 51 Gurugram",
     } = req.body || {};
 
+    // Validate required fields
     if (!name || !phone) {
-      console.warn("[/api/lead] Missing required fields: name or phone");
       return res.status(400).json({
         success: false,
         error: "Name and phone are required",
@@ -41,7 +63,7 @@ app.post("/api/lead", async (req, res) => {
     const authKey = process.env.CRM_AUTH_KEY;
 
     if (!authKey) {
-      console.error("[/api/lead] CRM_AUTH_KEY is not set in environment");
+      console.error("CRM_AUTH_KEY missing in environment variables");
       return res.status(500).json({
         success: false,
         error: "Server configuration error",
@@ -60,8 +82,7 @@ app.post("/api/lead", async (req, res) => {
       property_project_name,
     };
 
-    console.log("[/api/lead] Forwarding payload to CRM:", crmPayload);
-    console.log("[/api/lead] CRM URL:", crmUrl);
+    console.log("Sending to CRM:", crmPayload);
 
     const crmResponse = await fetch(crmUrl, {
       method: "POST",
@@ -71,19 +92,19 @@ app.post("/api/lead", async (req, res) => {
       body: JSON.stringify(crmPayload),
     });
 
-    const crmData = await crmResponse.json().catch((erFr) => {
-      console.error("[/api/lead] Error parsing CRM JSON:", err);
-      throw new Error("Failed to parse CRM response");
-    });
-
-    console.log("[/api/lead] CRM raw response:", crmData);
+    let crmData;
+    try {
+      crmData = await crmResponse.json();
+    } catch (err) {
+      console.error("Error parsing CRM response:", err);
+      return res.status(500).json({
+        success: false,
+        error: "Invalid CRM response",
+      });
+    }
 
     if (!crmResponse.ok) {
-      console.error("[/api/lead] CRM responded with non-2xx status:", {
-        status: crmResponse.status,
-        statusText: crmResponse.statusText,
-        data: crmData,
-      });
+      console.error("CRM returned error:", crmData);
       return res.status(500).json({
         success: false,
         error: "Failed to create lead in CRM",
@@ -96,7 +117,7 @@ app.post("/api/lead", async (req, res) => {
       crmResponse: crmData,
     });
   } catch (error) {
-    console.error("[/api/lead] Unexpected server error:", error);
+    console.error("Unexpected server error:", error);
     return res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -104,11 +125,12 @@ app.post("/api/lead", async (req, res) => {
   }
 });
 
+// Health check route
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+// Start server
 app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
+  console.log(`Backend server running on port ${PORT}`);
 });
-
