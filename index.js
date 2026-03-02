@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 5000;
 */
 
 const allowedOrigins = [
-  "http://localhost:3000",
+  "http://localhost:8080",
   process.env.FRONTEND_URL, // optional production frontend URL
 ].filter(Boolean);
 
