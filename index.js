@@ -17,29 +17,25 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   "https://www.orchid-ivy.com",
   "https://orchid-ivy.com",
-  process.env.FRONTEND_URL, // optional
+  process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow Postman or server-to-server calls
       if (!origin) return callback(null, true);
 
       if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
+        callback(null, true);
       } else {
-        console.log("❌ Blocked by CORS:", origin);
-        return callback(new Error("Not allowed by CORS"));
+        console.log("Blocked by CORS:", origin);
+        callback(null, false);
       }
     },
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
-// Handle preflight requests
-app.options("*", cors());
 
 app.use(express.json());
 
@@ -59,7 +55,7 @@ const CRM_BASE_URL =
 */
 
 app.post("/api/lead", async (req, res) => {
-  console.log("📩 Incoming Lead:", req.body);
+  console.log("Incoming Lead:", req.body);
 
   try {
     const {
@@ -70,7 +66,6 @@ app.post("/api/lead", async (req, res) => {
       property_project_name = "Orchid IVY - Sector 51 Gurugram",
     } = req.body || {};
 
-    // Basic validation
     if (!name || !phone) {
       return res.status(400).json({
         success: false,
@@ -81,7 +76,6 @@ app.post("/api/lead", async (req, res) => {
     const authKey = process.env.CRM_AUTH_KEY;
 
     if (!authKey) {
-      console.error("❌ CRM_AUTH_KEY missing in env");
       return res.status(500).json({
         success: false,
         error: "Server configuration error",
@@ -100,46 +94,28 @@ app.post("/api/lead", async (req, res) => {
       property_project_name,
     };
 
-    console.log("➡️ Sending to CRM:", crmPayload);
-
     const crmResponse = await fetch(crmUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(crmPayload),
     });
 
-    let crmData;
-
-    try {
-      crmData = await crmResponse.json();
-    } catch (err) {
-      console.error("❌ CRM JSON parse error:", err);
-      return res.status(500).json({
-        success: false,
-        error: "Invalid CRM response",
-      });
-    }
+    const crmData = await crmResponse.json();
 
     if (!crmResponse.ok) {
-      console.error("❌ CRM Error:", crmData);
       return res.status(500).json({
         success: false,
-        error: "Failed to create lead in CRM",
+        error: "CRM error",
         details: crmData,
       });
     }
-
-    console.log("✅ CRM Success:", crmData);
 
     return res.status(200).json({
       success: true,
       crmResponse: crmData,
     });
   } catch (error) {
-    console.error("❌ Unexpected Server Error:", error);
-
+    console.error("Server Error:", error);
     return res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -164,5 +140,5 @@ app.get("/health", (req, res) => {
 */
 
 app.listen(PORT, () => {
-  console.log(`🚀 Backend running on port ${PORT}`);
+  console.log(`Backend running on port ${PORT}`);
 });
