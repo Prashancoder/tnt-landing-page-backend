@@ -6,43 +6,60 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || "https://tnt-landing-page-backend-1.onrender.com";
+const PORT = process.env.PORT || 5000;
 
 /*
-  CORS Configuration
-  Allow:
-  - Localhost (development)
-  - Production frontend (set FRONTEND_URL in Render env if needed)
+  ============================
+  CORS CONFIGURATION
+  ============================
 */
 
 const allowedOrigins = [
-  "https://www.orchid-ivy.com/",
-  // "http://localhost:5001",
-  process.env.FRONTEND_URL, // optional production frontend URL
+  "https://www.orchid-ivy.com",
+  "https://orchid-ivy.com",
+  process.env.FRONTEND_URL, // optional
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like Postman)
+      // Allow Postman or server-to-server calls
       if (!origin) return callback(null, true);
 
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       } else {
+        console.log("❌ Blocked by CORS:", origin);
         return callback(new Error("Not allowed by CORS"));
       }
     },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
+// Handle preflight requests
+app.options("*", cors());
+
 app.use(express.json());
+
+/*
+  ============================
+  CRM CONFIG
+  ============================
+*/
 
 const CRM_BASE_URL =
   "https://ttr171-api.iqsetter.com/crm/lead/create?authkey=";
 
+/*
+  ============================
+  LEAD API
+  ============================
+*/
+
 app.post("/api/lead", async (req, res) => {
-  console.log("[/api/lead] Incoming request:", req.body);
+  console.log("📩 Incoming Lead:", req.body);
 
   try {
     const {
@@ -53,7 +70,7 @@ app.post("/api/lead", async (req, res) => {
       property_project_name = "Orchid IVY - Sector 51 Gurugram",
     } = req.body || {};
 
-    // Validate required fields
+    // Basic validation
     if (!name || !phone) {
       return res.status(400).json({
         success: false,
@@ -64,7 +81,7 @@ app.post("/api/lead", async (req, res) => {
     const authKey = process.env.CRM_AUTH_KEY;
 
     if (!authKey) {
-      console.error("CRM_AUTH_KEY missing in environment variables");
+      console.error("❌ CRM_AUTH_KEY missing in env");
       return res.status(500).json({
         success: false,
         error: "Server configuration error",
@@ -83,7 +100,7 @@ app.post("/api/lead", async (req, res) => {
       property_project_name,
     };
 
-    console.log("Sending to CRM:", crmPayload);
+    console.log("➡️ Sending to CRM:", crmPayload);
 
     const crmResponse = await fetch(crmUrl, {
       method: "POST",
@@ -94,10 +111,11 @@ app.post("/api/lead", async (req, res) => {
     });
 
     let crmData;
+
     try {
       crmData = await crmResponse.json();
     } catch (err) {
-      console.error("Error parsing CRM response:", err);
+      console.error("❌ CRM JSON parse error:", err);
       return res.status(500).json({
         success: false,
         error: "Invalid CRM response",
@@ -105,7 +123,7 @@ app.post("/api/lead", async (req, res) => {
     }
 
     if (!crmResponse.ok) {
-      console.error("CRM returned error:", crmData);
+      console.error("❌ CRM Error:", crmData);
       return res.status(500).json({
         success: false,
         error: "Failed to create lead in CRM",
@@ -113,12 +131,15 @@ app.post("/api/lead", async (req, res) => {
       });
     }
 
+    console.log("✅ CRM Success:", crmData);
+
     return res.status(200).json({
       success: true,
       crmResponse: crmData,
     });
   } catch (error) {
-    console.error("Unexpected server error:", error);
+    console.error("❌ Unexpected Server Error:", error);
+
     return res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -126,12 +147,22 @@ app.post("/api/lead", async (req, res) => {
   }
 });
 
-// Health check route
+/*
+  ============================
+  HEALTH CHECK
+  ============================
+*/
+
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// Start server
+/*
+  ============================
+  START SERVER
+  ============================
+*/
+
 app.listen(PORT, () => {
-  console.log(`Backend server running on port ${PORT}`);
+  console.log(`🚀 Backend running on port ${PORT}`);
 });
