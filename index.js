@@ -17,6 +17,8 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   "https://www.orchid-ivy.com",
   "https://orchid-ivy.com",
+  "https://www.ocusmedley.in",
+  "https://ocusmedley.in",
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
